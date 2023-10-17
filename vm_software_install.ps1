@@ -1,3 +1,8 @@
+param (
+    [string]$adminUsername,
+    [string]$vmName
+)
+
 # Enhanced logging function
 function Log-Message {
     param (
@@ -44,7 +49,7 @@ Log-Message "SQL Installer files found on: $driveLetter"
 
 # Set up the path to the setup executable and the ConfigurationFile
 $installPath = Join-Path -Path $driveLetter -ChildPath "setup.exe"
-$installArguments = "/Configurationfile=$configurationFileLocation /IAcceptSQLServerLicenseTerms"
+$installArguments = "/Configurationfile=$configurationFileLocation /IAcceptSQLServerLicenseTerms /SQLSYSADMINACCOUNTS=`"$vmName\$adminUsername`""
 
 # Execute the SQL Server installation
 Start-Process -FilePath $installPath -ArgumentList $installArguments -Wait -NoNewWindow
