@@ -71,7 +71,8 @@ Write-Host "Download completed for Visual Studio 2022 Professional Bootstrapper 
 
 # Installation of Visual Studio 2022 using Bootstrapper
 Write-Host "Starting installation for Visual Studio 2022 using Bootstrapper..."
-Start-Process -Wait -FilePath "$downloadDir\vs2022-professional-bootstrapper.exe" -ArgumentList "install --wait --add Microsoft.VisualStudio.Workload.NetWeb --add Microsoft.VisualStudio.Workload.NetCoreTools" | Wait-Process
+$vsInstallPath = Join-Path -Path $env:SystemDrive -ChildPath "VisualStudio2022"
+Start-Process -Wait -FilePath "$downloadDir\vs2022-professional-bootstrapper.exe" -ArgumentList "install --wait --add Microsoft.VisualStudio.Workload.NetWeb --add Microsoft.VisualStudio.Workload.NetCoreTools --quiet --norestart --path.install $vsInstallPath" | Wait-Process
 Write-Host "Visual Studio 2022 installed successfully using Bootstrapper."
 
 # Installation of Visual Studio Code
