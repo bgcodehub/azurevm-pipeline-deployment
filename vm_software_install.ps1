@@ -1,6 +1,11 @@
 # Set download directory to TEMP
 $downloadDir = $env:TEMP
-$configurationFile =  ".\config\ConfigurationFile.ini"
+
+# Download the ConfigurationFile.ini from the GitHub raw link
+$configurationFileURL = "https://raw.githubusercontent.com/bgcodehub/rnd_pipeline/main/config/ConfigurationFile.ini"
+$configurationFileLocation = "$downloadDir\ConfigurationFile.ini"
+Invoke-WebRequest -Uri $configurationFileURL -OutFile $configurationFileLocation
+Write-Host "Configuration file downloaded successfully."
 
 Write-Host "Starting software installation on VM..." -ForegroundColor Yellow
 
