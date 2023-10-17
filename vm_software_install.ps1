@@ -8,7 +8,7 @@ function Log-Message {
     param (
         [string]$Message
     )
-    Write-Host "$(Get-Date) - $Message" -ForegroundColor Yellow
+    Write-Host "##vso[task.logissue type=info;]$(Get-Date) - $Message"
 }
 
 # Set download directory to TEMP
