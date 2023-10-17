@@ -1,3 +1,11 @@
+# Enhanced logging function
+function Log-Message {
+    param (
+        [string]$Message
+    )
+    Write-Host "$(Get-Date) - $Message" -ForegroundColor Yellow
+}
+
 # Set download directory to TEMP
 $downloadDir = $env:TEMP
 
@@ -5,37 +13,46 @@ $downloadDir = $env:TEMP
 $configurationFileURL = "https://raw.githubusercontent.com/bgcodehub/rnd_pipeline/main/config/ConfigurationFile.ini"
 $configurationFileLocation = "$downloadDir\ConfigurationFile.ini"
 Invoke-WebRequest -Uri $configurationFileURL -OutFile $configurationFileLocation
-Write-Host "Configuration file downloaded successfully."
+Log-Message "Configuration file downloaded successfully."
 
-Write-Host "Starting software installation on VM..." -ForegroundColor Yellow
+Log-Message "Starting software installation on VM..."
 
 # Download SQL Server Installer
-Write-Host "Downloading SQL Server Installer..."
+Log-Message "Downloading SQL Server Installer..."
 $sqlInstallerURL = "https://go.microsoft.com/fwlink/?linkid=2215202&clcid=0x409&culture=en-us&country=us"
-Invoke-WebRequest -Uri $sqlInstallerURL -OutFile "$downloadDir\sqlinstaller.exe"
-Write-Host "SQL Server Installer downloaded successfully."
+$sqlInstallerPath = "$downloadDir\sqlinstaller.exe"
+Invoke-WebRequest -Uri $sqlInstallerURL -OutFile $sqlInstallerPath
+Log-Message "SQL Server Installer downloaded successfully."
+
+# Verify installer size
+$installerSize = (Get-Item $sqlInstallerPath).length / 1MB
+Log-Message "Installer size: $installerSize MB"
 
 # Execute SQL Server Installer
-Write-Host "Starting SQL Server installation..."
-Start-Process -Wait -FilePath "$downloadDir\sqlinstaller.exe" -ArgumentList "/Action=Download /MEDIAPATH=$downloadDir /MEDIATYPE=ISO /Q" | Wait-Process
-Write-Host "SQL Server installation files downloaded."
+Log-Message "Starting SQL Server installation..."
+Start-Process -Wait -FilePath $sqlInstallerPath -ArgumentList "/Action=Download /MEDIAPATH=$downloadDir /MEDIATYPE=ISO /Q" | Wait-Process
+Log-Message "SQL Server installation files downloaded."
+
+# Verify the ISO file size
+$isoSize = (Get-Item "$downloadDir\SQLServer2022-x64-ENU.iso").length / 1MB
+Log-Message "ISO size: $isoSize MB"
 
 # Mount the ISO file
 $MountVolume = Mount-DiskImage -ImagePath "$downloadDir\SQLServer2022-x64-ENU.iso" -PassThru
 $driveLetter = ($Mountvolume | Get-Volume).DriveLetter + ":"
-Write-Host "SQL Installer files found on: $driveLetter" -ForegroundColor Green
+Log-Message "SQL Installer files found on: $driveLetter"
 
 # Set up the path to the setup executable and the ConfigurationFile
 $installPath = Join-Path -Path $driveLetter -ChildPath "setup.exe"
-$installArguments = "/Configurationfile=$configurationFile /IAcceptSQLServerLicenseTerms"
+$installArguments = "/Configurationfile=$configurationFileLocation /IAcceptSQLServerLicenseTerms"
 
 # Execute the SQL Server installation
 Start-Process -FilePath $installPath -ArgumentList $installArguments -Wait -NoNewWindow
-Write-Host "SQL Server installation completed."
+Log-Message "SQL Server installation completed."
 
 # Clean up
 Dismount-DiskImage -ImagePath "$downloadDir\SQLServer2022-x64-ENU.iso"
-Remove-Item -Path "$downloadDir\sqlinstaller.exe"
+Remove-Item -Path $sqlInstallerPath
 
 # Dynamic Download of Visual Studio 2022 Professional Bootstrapper & Visual Studio Code
 Write-Host "Downloading Visual Studio 2022 Professional Bootstrapper and Visual Studio Code..."
