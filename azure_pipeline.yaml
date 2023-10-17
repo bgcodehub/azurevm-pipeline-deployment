@@ -1,0 +1,101 @@
+parameters:
+- name: userPublicIp
+  displayName: 'User Public IP'
+  type: string
+  default: ''
+
+trigger: none
+
+pool:
+  vmImage: 'windows-latest'
+
+stages:
+- stage: VM_Creation
+  jobs:
+  - job: Create_VM
+    steps:
+    - powershell: |
+        # Uninstall AzureRM if it's present
+        if (Get-Module -ListAvailable -Name AzureRM) {
+          Write-Host "Uninstalling AzureRM module..."
+          Uninstall-Module -Name AzureRM -AllVersions -Force -ErrorAction SilentlyContinue
+        } else {
+          Write-Host "AzureRM module not found."
+        }
+      displayName: 'Uninstall AzureRM Module'
+    - powershell: |
+        # Install/Update Az module to latest version
+        Install-Module -Name Az -AllowClobber -Force -Scope CurrentUser -SkipPublisherCheck -AllowPrerelease
+        Import-Module Az
+      displayName: 'Install/Update Az Module'
+    - task: AzurePowerShell@4
+      inputs:
+        azureSubscription: $(azureSubscription)
+        ScriptType: 'FilePath'
+        ScriptPath: './create_vm.ps1'
+        azurePowerShellVersion: 'LatestVersion'
+        ScriptArguments: '-vmName $(vmName) -resourceGroup $(resourceGroup) -location $(location) -adminUsername $(adminUsername) -adminPasswordPlain $(adminPassword)'
+      displayName: 'Create VM'
+
+- stage: Azure_Configuration
+  jobs:
+  - job: Configure_Azure
+    steps:
+    - powershell: |
+        # Uninstall AzureRM if it's present
+        if (Get-Module -ListAvailable -Name AzureRM) {
+          Write-Host "Uninstalling AzureRM module..."
+          Uninstall-Module -Name AzureRM -AllVersions -Force -ErrorAction SilentlyContinue
+        } else {
+          Write-Host "AzureRM module not found."
+        }
+      displayName: 'Uninstall AzureRM Module'
+    - powershell: |
+        # Install/Update Az module to latest version
+        Install-Module -Name Az -AllowClobber -Force -Scope CurrentUser -SkipPublisherCheck -AllowPrerelease
+        Import-Module Az
+      displayName: 'Install/Update Az Module'
+    - task: AzurePowerShell@4
+      inputs:
+        azureSubscription: $(azureSubscription)
+        ScriptType: 'FilePath'
+        ScriptPath: './configure_azure.ps1'
+        azurePowerShellVersion: 'LatestVersion'
+        ScriptArguments: '-vmName $(vmName) -resourceGroup $(resourceGroup) -userPublicIp ${{ parameters.userPublicIp }}'
+      displayName: 'Configure Azure Resources'
+
+- stage: VM_Preparation
+  jobs:
+  - job: Prepare_VM
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_preparation.ps1'
+      displayName: 'Prepare VM with pre-configuration settings'
+
+- stage: VM_Server_Configuration
+  jobs:
+  - job: Server_Config_VM
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_server_config.ps1'
+      displayName: 'Configure VM server-specific settings'
+
+- stage: Software_Installation
+  jobs:
+  - job: Install_Software_VM
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_software_install.ps1'
+      displayName: 'Install software on VM'
