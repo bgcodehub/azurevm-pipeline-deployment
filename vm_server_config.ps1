@@ -1,7 +1,8 @@
 param (
     [string]$emailAddress,
     [string]$domainPattern,
-    [string]$os
+    [string]$os,
+    [string]$dnsName
 )
 
 if ($os.ProductType -eq "2" -or $os.ProductType -eq "3") { # Server OS
@@ -13,6 +14,7 @@ if ($os.ProductType -eq "2" -or $os.ProductType -eq "3") { # Server OS
 }
 
 # Configure IIS for MIME types
+Install-WindowsFeature Web-Scripting-Tools
 Import-Module WebAdministration
 Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -location 'Default Web Site' -filter "system.webServer/staticContent" -name "." -value @{fileExtension='.';mimeType='text/plain'}
 
@@ -25,12 +27,19 @@ $appcmd = "c:\windows\system32\inetsrv\appcmd.exe"
 & $appcmd set config -section:staticContent /+"[fileExtension='.',mimeType='text/plain']"
 
 # Apply the Strong Crypto registry settings
-Invoke-Expression -Command "reg import '.\config\StrongCrypto+DisableSSL2.0-3.0-TLS1.0-1.0.reg'"
+Invoke-Expression -Command "reg import '$(Build.SourcesDirectory)\config\StrongCrypto+DisableSSL2.0-3.0-TLS1.0-1.0.reg'"
 
-# Acquire built-in certificate thumbprint and create a temporary https binding to it, will update to LetsEncrypt cert later
-$getcert=$(Get-ChildItem -Path Cert:LocalMachine\MY | Where-Object {$_.FriendlyName -eq "TenantEncryptionCert"})
-$thumbprint=$getcert.Thumbprint
-Import-Module WebAdministration;New-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:$domainPattern" -CertificateThumbPrint $thumbprint -CertStoreLocation "Cert:\LocalMachine\MY" -Protocol https
+# Check if 'TenantEncryptionCert' certificate exists
+$getcert = Get-ChildItem -Path Cert:LocalMachine\MY | Where-Object {$_.FriendlyName -eq "TenantEncryptionCert"}
+
+# If not, create a new self-signed certificate
+if (-not $getcert) {
+    $getcert = New-SelfSignedCertificate -DnsName $dnsName -CertStoreLocation "cert:\LocalMachine\My" -FriendlyName "TenantEncryptionCert"
+}
+
+$thumbprint = $getcert.Thumbprint
+Import-Module WebAdministration
+New-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:$domainPattern" -CertificateThumbPrint $thumbprint -CertStoreLocation "Cert:\LocalMachine\MY" -Protocol https
 
 # Dynamically Download and Setup Latest Version of Win-Acme
 $ProgressPreference = 'SilentlyContinue'

@@ -93,7 +93,7 @@ stages:
         azureSubscription: $(azureSubscription)
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
-        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_server_config.ps1'
+        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_server_config.ps1 --parameters "dnsName=$(dnsName)" "emailAddress=$(emailAddress)" "domainPattern=$(domainPattern)"'
       displayName: 'Configure VM server-specific settings'
 
 - stage: Software_Installation
