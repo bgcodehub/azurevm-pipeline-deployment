@@ -34,14 +34,9 @@ $denyIPRanges = @(
     "45.146.164.0/24", "45.155.205.0/24", "45.145.65.0/24"
 )
 
-$priority = 110 # Start with 110 to ensure it's processed after the Allow rule
-
-foreach ($ip in $denyIPRanges) {
-    $formattedIP = $ip.Replace('/', '-').Replace('.', '-')
-    $rule = New-AzNetworkSecurityRuleConfig -Name "Deny-$formattedIP" -Description "Deny $ip" -Access "Deny" -Protocol "*" -Direction "Inbound" -Priority $priority -SourceAddressPrefix $ip -SourcePortRange "*" -DestinationAddressPrefix "*" -DestinationPortRange "*"
-    $nsg.SecurityRules.Add($rule)
-    $priority++ # Increase priority for the next rule
-}
+# Create a single deny rule for the IPs
+$rule = New-AzNetworkSecurityRuleConfig -Name "Deny-MultipleIPs" -Description "Deny multiple IPs" -Access "Deny" -Protocol "*" -Direction "Inbound" -Priority 110 -SourceAddressPrefix $denyIPRanges -SourcePortRange "*" -DestinationAddressPrefix "*" -DestinationPortRange "*"
+$nsg.SecurityRules.Add($rule)
 
 # Apply the updated NSG
 Set-AzNetworkSecurityGroup -NetworkSecurityGroup $nsg
