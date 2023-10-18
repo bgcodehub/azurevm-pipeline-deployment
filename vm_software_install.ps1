@@ -1,5 +1,7 @@
 param (
-    [string]$vsEdition = "Professional"
+    [string]$vsEdition = "Professional",
+    [string]$vmName,
+    [string]$adminUsername
 )
 
 # Enhanced logging function
@@ -20,6 +22,12 @@ $configurationFileURL = "https://raw.githubusercontent.com/bgcodehub/rnd_pipelin
 $configurationFileLocation = "$downloadDir\ConfigurationFile.ini"
 Invoke-WebRequest -Uri $configurationFileURL -OutFile $configurationFileLocation
 Log-Message "Configuration file downloaded successfully."
+
+# Update the SQLSYSADMINACCOUNTS in the ConfigurationFile.ini with the passed values
+$configContent = Get-Content $configurationFileLocation -Raw
+$replacementValue = "SQLSYSADMINACCOUNTS=`"$vmName\$adminUsername`""
+$updatedConfigContent = $configContent -replace 'SQLSYSADMINACCOUNTS="[^"]*"', $replacementValue
+Set-Content -Path $configurationFileLocation -Value $updatedConfigContent
 
 Log-Message "Starting software installation on VM..."
 

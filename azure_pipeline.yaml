@@ -105,5 +105,5 @@ stages:
         azureSubscription: $(azureSubscription)
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
-        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_software_install.ps1 --parameters vsEdition=${{ parameters.vsEdition }}'
+        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_software_install.ps1 --parameters "vsEdition=${{ parameters.vsEdition }}" "vmName=$(vmName)" "adminUsername=$(adminUsername)"'
       displayName: 'Install software on VM'
