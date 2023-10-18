@@ -104,18 +104,18 @@ switch ($vsEdition) {
 
 # Installation of Visual Studio Code (always executed)
 Log-Message "Starting the download of Visual Studio Code Installer..."
-$vsCodeInstallerURL = "https://aka.ms/win32-x64-user-stable"
+$vsCodeInstallerURL = "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64" 
 $vsCodeInstallerPath = "$downloadDir\vscode-system-installer.exe"
-Invoke-WebRequest -Uri $vsCodeInstallerURL -OutFile $vsCodeInstallerPath
+Invoke-WebRequest -Uri $vsCodeInstallerURL -OutFile "$downloadDir\vscode-system-installer.exe"
 Log-Message "Visual Studio Code Installer successfully downloaded."
 
 # Execute Visual Studio Code Installer
 Log-Message "Initiating Visual Studio Code installation process..."
-Start-Process -Wait -FilePath $vsCodeInstallerPath -ArgumentList "/silent", "/mergetasks=!runcode" | Wait-Process
+Start-Process -Wait -FilePath "$downloadDir\vscode-system-installer.exe" -ArgumentList "/silent", "/mergetasks=!runcode" | Wait-Process
 Log-Message "Visual Studio Code installation completed."
 
 # Clean up VS Code installer
-Remove-Item -Path $vsCodeInstallerPath
+Remove-Item -Path "$downloadDir\vscode-system-installer.exe"
 Log-Message "Visual Studio Code installer removed."
 
 Log-Message "Preparing to restart the computer..."
