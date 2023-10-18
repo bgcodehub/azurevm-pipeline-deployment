@@ -3,6 +3,14 @@ parameters:
   displayName: 'User Public IP'
   type: string
   default: ''
+- name: vsEdition
+  displayName: 'Visual Studio Edition'
+  type: string
+  values:
+  - 'Enterprise'
+  - 'Professional'
+  - 'None'
+  default: 'Professional'
 
 trigger: none
 
@@ -97,5 +105,5 @@ stages:
         azureSubscription: $(azureSubscription)
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
-        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_software_install.ps1'
+        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_software_install.ps1 --parameters vsEdition=${{ parameters.vsEdition }}'
       displayName: 'Install software on VM'
