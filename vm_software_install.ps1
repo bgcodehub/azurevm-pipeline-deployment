@@ -31,41 +31,41 @@ Set-Content -Path $configurationFileLocation -Value $updatedConfigContent
 
 Log-Message "Starting software installation on VM..."
 
-if ($vsEdition -ne "None") {
+if ($vsEdition -ne "None (No SQL)") {
     # Download SQL Server Installer
     Log-Message "Starting download of SQL Server Installer..."
     $sqlInstallerURL = "https://go.microsoft.com/fwlink/?linkid=2215202&clcid=0x409&culture=en-us&country=us"
     $sqlInstallerPath = "$downloadDir\sqlinstaller.exe"
     Invoke-WebRequest -Uri $sqlInstallerURL -OutFile $sqlInstallerPath
     Log-Message "SQL Server Installer successfully downloaded."
-
+    
     # Verify installer size
     $installerSize = (Get-Item $sqlInstallerPath).length / 1MB
     Log-Message "Verified SQL Installer size: $installerSize MB"
-
+    
     # Execute SQL Server Installer
     Log-Message "Initiating SQL Server installation process..."
     Start-Process -Wait -FilePath $sqlInstallerPath -ArgumentList "/Action=Download /MEDIAPATH=$downloadDir /MEDIATYPE=ISO /Q" | Wait-Process
     Log-Message "SQL Server installation files successfully downloaded."
-
+    
     # Verify the ISO file size
     $isoSize = (Get-Item "$downloadDir\SQLServer2022-x64-ENU.iso").length / 1MB
     Log-Message "Verified ISO file size: $isoSize MB"
-
+    
     # Mount the ISO file
     $MountVolume = Mount-DiskImage -ImagePath "$downloadDir\SQLServer2022-x64-ENU.iso" -PassThru
     $driveLetter = ($Mountvolume | Get-Volume).DriveLetter + ":"
     Log-Message "SQL Installer files are available on: $driveLetter"
-
+    
     # Set up the path to the setup executable and the ConfigurationFile
     $installPath = Join-Path -Path $driveLetter -ChildPath "setup.exe"
     $installArguments = "/Configurationfile=$configurationFileLocation /IAcceptSQLServerLicenseTerms /Q"
-
+    
     # Execute the SQL Server installation
     Log-Message "Beginning SQL Server installation using configuration file..."
     Start-Process -FilePath $installPath -ArgumentList $installArguments -Wait -NoNewWindow
     Log-Message "SQL Server installation has been completed."
-
+    
     # Clean up
     Log-Message "Cleaning up SQL Server installation artifacts..."
     Dismount-DiskImage -ImagePath "$downloadDir\SQLServer2022-x64-ENU.iso"
@@ -105,8 +105,11 @@ switch ($vsEdition) {
         Remove-Item -Path "$downloadDir\vs2022-enterprise-bootstrapper.exe"
         Log-Message "Visual Studio 2022 Enterprise Bootstrapper installer removed."
     }
-    "None" {
-        Log-Message "Skipping Visual Studio installation as per user's choice."
+    "None (No SQL)" {
+        Log-Message "Skipping Visual Studio and SQL Server installation as per user's choice."
+    }
+    "None (+ SQL Server)" {
+        Log-Message "SQL Server was installed, but skipping Visual Studio installation as per user's choice."
     }
 }
 

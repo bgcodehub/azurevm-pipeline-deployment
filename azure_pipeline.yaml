@@ -9,7 +9,8 @@ parameters:
   values:
   - 'Enterprise'
   - 'Professional'
-  - 'None'
+  - 'None (No SQL)'
+  - 'None (+ SQL Server)'
   default: 'Professional'
 
 trigger: none
