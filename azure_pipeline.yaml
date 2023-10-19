@@ -42,7 +42,9 @@ stages:
         ScriptType: 'FilePath'
         ScriptPath: './create_vm.ps1'
         azurePowerShellVersion: 'LatestVersion'
-        ScriptArguments: '-vmName $(vmName) -resourceGroup $(resourceGroup) -location $(location) -adminUsername $(adminUsername) -adminPasswordPlain $(adminPassword)'
+        ScriptArguments: '-vmName $(vmName) -resourceGroup $(resourceGroup) -location $(location) -adminUsername $(adminUsername)'
+      env:
+        ADMINPASSWORD: $(adminPassword)
       displayName: 'Create VM'
 
 - stage: Azure_Configuration

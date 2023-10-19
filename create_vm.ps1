@@ -2,8 +2,7 @@ param (
     [string]$vmName,
     [string]$resourceGroup,
     [string]$location,
-    [string]$adminUsername,
-    [string]$adminPasswordPlain
+    [string]$adminUsername
 )
 
 function Wait-ForResourceReady {
@@ -25,8 +24,8 @@ function Wait-ForResourceReady {
     }
 }
 
-# Convert the plain-text password to a SecureString
-$securePassword = ConvertTo-SecureString -String $adminPasswordPlain -AsPlainText -Force
+# Convert the password from the environment variable to a SecureString
+$securePassword = ConvertTo-SecureString -String ${env:ADMINPASSWORD} -AsPlainText -Force
 
 # Create the PSCredential object
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $adminUsername, $securePassword
@@ -43,4 +42,4 @@ New-AzVm `
   -Size "Standard_D4s_v3" `
   -Credential $credential `
   -PublicIpAddressName $pip.Name `
-  -Image 'MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition:latest' `
+  -Image 'MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition:latest'
