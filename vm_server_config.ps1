@@ -12,6 +12,7 @@ if ($osType.ProductType -eq "2" -or $osType.ProductType -eq "3") { # Server OS
 } elseif ($osType.ProductType -eq "1") { # Client OS
     # Install the necessary features for Client OS
     Enable-WindowsOptionalFeature -Online -FeatureName NetFx4-AdvSrvs, NetFx4Extended-ASPNET45, WCF-HTTP-Activation45, WCF-Pipe-Activation45, WCF-TCP-Activation45, WCF-TCP-PortSharing45, IIS-WebServerRole, IIS-NetFxExtensibility45, IIS-ASPNET45, IIS-ISAPIExtensions, IIS-ISAPIFilter, IIS-WebSockets, IIS-RequestMonitor, IIS-ManagementConsole, IIS-HttpCompressionDynamic, IIS-BasicAuthentication, IIS-WindowsAuthentication, IIS-ApplicationInit, WAS-WindowsActivationService, WAS-ConfigurationAPI
+
 }
 
 # Configure IIS for MIME types
@@ -35,14 +36,14 @@ $appcmd = "$env:windir\system32\inetsrv\appcmd.exe"
 & $appcmd set site "Default Web Site" /+limits.maxBandwidth:500000
 
 # Disable WebDAV
-Remove-WindowsFeature Web-DAV
+Remove-WindowsFeature Web-DAV-Publishing
 
 # Download the Strong Crypto registry settings from GitHub
 $repoUrl = "https://raw.githubusercontent.com/bgcodehub/azurevm-pipeline-deployment/main/config/StrongCrypto%2BDisableSSL2.0-3.0-TLS1.0-1.1.reg"
-Invoke-WebRequest -Uri $repoUrl -OutFile "c:\temp\StrongCrypto+DisableSSL2.0-3.0-TLS1.0-1.1.reg"
+Invoke-WebRequest -Uri $repoUrl -OutFile "c:\StrongCrypto.reg"
 
-# Apply the Strong Crypto registry settings
-Invoke-Expression -Command "reg import 'c:\temp\StrongCrypto+DisableSSL2.0-3.0-TLS1.0-1.1.reg'"
+# Install the registry settings
+reg import "c:\StrongCrypto.reg"
 
 # Ensure the temporary certificate is used for the IIS binding 
 $getcert = New-SelfSignedCertificate -DnsName $dnsName -CertStoreLocation "cert:\LocalMachine\My" -FriendlyName "TenantEncryptionCert"
@@ -61,24 +62,22 @@ $latestacmelink = $latestacmelink.Replace('tag','download')
 Invoke-WebRequest "$latestacmelink/win-acme.$latestacmeversion.x64.trimmed.zip" -OutFile "c:\temp\win-acme.$latestacmeversion.x64.trimmed.zip"
 Expand-Archive -Path c:\temp\win-acme.$latestacmeversion.x64.trimmed.zip -DestinationPath 'c:\win-acme'
 
-# Use Win-ACME to obtain a Let's Encrypt certificate
+# Setup win-acme with the provided domain pattern and email address
 $wacs = "c:\win-acme\wacs.exe"
 & $wacs --source iis --host-pattern $domainPattern --accepttos --emailaddress $emailAddress --closeonfinish
 
-# Check if the new certificate was generated
-$letsEncryptCert = Get-ChildItem -Path Cert:\LocalMachine\WebHosting | Where-Object {$_.Subject -like "CN=$domainPattern"} | Sort-Object NotAfter -Descending | Select-Object -First 1
+# Recreate the HTTPS binding with the new cert
+$getnewcert = Get-ChildItem -Path Cert:LocalMachine\WebHosting | Where-Object {$_.Subject -like "CN=$domainPattern"}
+$newthumbprint = $getnewcert.Thumbprint
+Remove-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:$domainPattern" -Protocol https -Confirm:$False
+$latestCert = Get-ChildItem -Path Cert:LocalMachine\WebHosting | Where-Object {$_.Subject -eq "CN=$domainPattern"} | Sort-Object NotAfter -Descending | Select-Object -First 1
 
-if ($letsEncryptCert) {
-    Write-Host "Successfully fetched Let's Encrypt Certificate with Thumbprint: $($letsEncryptCert.Thumbprint)" -ForegroundColor Green
-    
-    # Remove the old IIS binding
-    Remove-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:$domainPattern" -Protocol https -Confirm:$False -RemoveConfigOnly
-
-    # Create the new binding with the Let's Encrypt certificate
-    New-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:$domainPattern" -CertificateThumbPrint $letsEncryptCert.Thumbprint -CertStoreLocation "Cert:\LocalMachine\WebHosting" -Protocol https -Force
-    Write-Host "IIS binding updated successfully with the Let's Encrypt certificate." -ForegroundColor Green
+if ($latestCert) {
+    # Add the new HTTPS binding using the located certificate's thumbprint and use the -Force switch
+    New-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:$domainPattern" -CertificateThumbPrint $latestCert.Thumbprint -CertStoreLocation "Cert:\LocalMachine\WebHosting" -Protocol https -Force
+    Write-Host "HTTPS binding updated successfully with the thumbprint $($latestCert.Thumbprint)" -ForegroundColor Green
 } else {
-    Write-Host "Failed to fetch Let's Encrypt Certificate for $domainPattern." -ForegroundColor Red
+    Write-Host "Could not find a valid certificate for $domainPattern in the WebHosting store." -ForegroundColor Red
 }
 
 # Dynamic Download of .NET Hosting Bundle
