@@ -2,7 +2,8 @@ param (
     [string]$vmName,
     [string]$resourceGroup,
     [string]$location,
-    [string]$adminUsername
+    [string]$adminUsername,
+    [string]$dnsName
 )
 
 function Wait-ForResourceReady {
@@ -30,8 +31,8 @@ $securePassword = ConvertTo-SecureString -String ${env:ADMINPASSWORD} -AsPlainTe
 # Create the PSCredential object
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $adminUsername, $securePassword
 
-# Create a public IP address with Static allocation and Standard SKU
-$pip = New-AzPublicIpAddress -Name "$vmName-PublicIP" -ResourceGroupName $resourceGroup -Location $location -AllocationMethod Static -Sku Standard
+# Create a public IP address with Static allocation, Standard SKU, and the desired DNS name label
+$pip = New-AzPublicIpAddress -Name "$vmName-PublicIP" -ResourceGroupName $resourceGroup -Location $location -AllocationMethod Static -Sku Standard -DomainNameLabel $dnsName
 Wait-ForResourceReady -resource $pip
 
 # Create the VM with specified public IP

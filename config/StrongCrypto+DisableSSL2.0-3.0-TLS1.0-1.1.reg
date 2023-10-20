@@ -55,3 +55,10 @@ Windows Registry Editor Version 5.00
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Server]
 "DisabledByDefault"=dword:00000000
 "Enabled"=dword:00000001
+
+; Disabling weak CBC-based cipher suites for TLS 1.2
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Ciphers\TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384]
+"Enabled"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Ciphers\TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256]
+"Enabled"=dword:00000000
