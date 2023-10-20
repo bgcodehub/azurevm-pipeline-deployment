@@ -18,10 +18,24 @@ if ($osType.ProductType -eq "2" -or $osType.ProductType -eq "3") { # Server OS
 Install-WindowsFeature Web-Scripting-Tools
 Import-Module WebAdministration
 Add-WebConfiguration -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.webServer/staticContent/mimeMap" -value @{fileExtension=".";mimeType="text/plain"} -Force
+Add-WebConfiguration -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.webServer/security/access" -value @{sslFlags="Ssl, SslNegotiateCert, SslRequireCert, Ssl128"} -Force
+Add-WebConfiguration -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.webServer/security/authentication/iisClientCertificateMappingAuthentication" -value @{enabled="true"} -Force
+Add-WebConfiguration -pspath 'MACHINE/WEBROOT/APPHOST' -filter "system.webServer/security/authentication/iisClientCertificateMappingAuthentication/manyToOneMappings" -value @{enabled="true";name="ECDH Configuration";description="ECDH with Strong Crypto";permissionMode="Allow"} -Force
 
-# Enable HSTS
+# Enable HSTS and other security headers
 $appcmd = "$env:windir\system32\inetsrv\appcmd.exe"
-& $appcmd set config -section:system.webServer/httpProtocol /+"customHeaders.[name='Strict-Transport-Security',value='max-age=31536000; includeSubDomains; preload']" /commit:apphost
+& $appcmd set config -section:system.webServer/httpProtocol /+"customHeaders.[name='Strict-Transport-Security',value='max-age=15768000; includeSubDomains; preload']" /commit:apphost
+& $appcmd set config -section:system.webServer/httpProtocol /+"customHeaders.[name='X-Content-Type-Options',value='nosniff']" /commit:apphost
+& $appcmd set config -section:system.webServer/httpProtocol /+"customHeaders.[name='Referrer-Policy',value='strict-origin-when-cross-origin']" /commit:apphost
+& $appcmd set config -section:system.webServer/httpProtocol /+"customHeaders.[name='X-XSS-Protection',value='1; mode=block']" /commit:apphost
+& $appcmd set config -section:system.webServer/httpProtocol /+"customHeaders.[name='X-Frame-Options',value='DENY']" /commit:apphost
+& $appcmd set config -section:system.webServer/httpProtocol /+"customHeaders.[name='Content-Security-Policy',value='default-src 'self';']" /commit:apphost
+& $appcmd set config /section:httpProtocol /-customHeaders.[name='Server']
+& $appcmd set config /section:serverSideInclude /+ssiExecDisable
+& $appcmd set site "Default Web Site" /+limits.maxBandwidth:500000
+
+# Disable WebDAV
+Remove-WindowsFeature Web-DAV
 
 # Download the Strong Crypto registry settings from GitHub
 $repoUrl = "https://raw.githubusercontent.com/bgcodehub/azurevm-pipeline-deployment/main/config/StrongCrypto%2BDisableSSL2.0-3.0-TLS1.0-1.1.reg"
@@ -47,21 +61,24 @@ $latestacmelink = $latestacmelink.Replace('tag','download')
 Invoke-WebRequest "$latestacmelink/win-acme.$latestacmeversion.x64.trimmed.zip" -OutFile "c:\temp\win-acme.$latestacmeversion.x64.trimmed.zip"
 Expand-Archive -Path c:\temp\win-acme.$latestacmeversion.x64.trimmed.zip -DestinationPath 'c:\win-acme'
 
+# Use Win-ACME to obtain a Let's Encrypt certificate
 $wacs = "c:\win-acme\wacs.exe"
 & $wacs --source iis --host-pattern $domainPattern --accepttos --emailaddress $emailAddress --closeonfinish
 
-# Recreate the HTTPS binding with the new cert
-$getnewcert = Get-ChildItem -Path Cert:LocalMachine\WebHosting | Where-Object {$_.Subject -like "CN=$domainPattern"}
-$newthumbprint = $getnewcert.Thumbprint
-Remove-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:bgtestapp.westus2.cloudapp.azure.com" -Protocol https -Confirm:$False -RemoveConfigOnly
-$latestCert = Get-ChildItem -Path Cert:LocalMachine\WebHosting | Where-Object {$_.Subject -eq "CN=bgtestapp.westus2.cloudapp.azure.com"} | Sort-Object NotAfter -Descending | Select-Object -First 1
+# Check if the new certificate was generated
+$letsEncryptCert = Get-ChildItem -Path Cert:\LocalMachine\WebHosting | Where-Object {$_.Subject -like "CN=$domainPattern"} | Sort-Object NotAfter -Descending | Select-Object -First 1
 
-if ($latestCert) {
-    # Add the new HTTPS binding using the located certificate's thumbprint and use the -Force switch
-    New-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:bgtestapp.westus2.cloudapp.azure.com" -CertificateThumbPrint $latestCert.Thumbprint -CertStoreLocation "Cert:\LocalMachine\WebHosting" -Protocol https -Force
-    Write-Host "HTTPS binding updated successfully with the thumbprint $($latestCert.Thumbprint)" -ForegroundColor Green
+if ($letsEncryptCert) {
+    Write-Host "Successfully fetched Let's Encrypt Certificate with Thumbprint: $($letsEncryptCert.Thumbprint)" -ForegroundColor Green
+    
+    # Remove the old IIS binding
+    Remove-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:$domainPattern" -Protocol https -Confirm:$False -RemoveConfigOnly
+
+    # Create the new binding with the Let's Encrypt certificate
+    New-IISSiteBinding -Name "Default Web Site" -BindingInformation "*:443:$domainPattern" -CertificateThumbPrint $letsEncryptCert.Thumbprint -CertStoreLocation "Cert:\LocalMachine\WebHosting" -Protocol https -Force
+    Write-Host "IIS binding updated successfully with the Let's Encrypt certificate." -ForegroundColor Green
 } else {
-    Write-Host "Could not find a valid certificate for bgtestapp.westus2.cloudapp.azure.com in the WebHosting store." -ForegroundColor Red
+    Write-Host "Failed to fetch Let's Encrypt Certificate for $domainPattern." -ForegroundColor Red
 }
 
 # Dynamic Download of .NET Hosting Bundle
