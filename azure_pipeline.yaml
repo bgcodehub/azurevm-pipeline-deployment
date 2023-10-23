@@ -12,6 +12,39 @@ parameters:
   - 'None (No SQL)'
   - 'None (+ SQL Server)'
   default: 'Professional'
+- name: resourceGroup
+  displayName: 'Resource Group'
+  type: string
+- name: vmName
+  displayName: 'VM Name'
+  type: string
+- name: location
+  displayName: 'Azure Location'
+  type: string
+  values:
+    - 'eastus2'
+    - 'eastus'
+    - 'westus'
+    - 'centralus'
+    - 'canadacentral'
+    - 'canadaeast'
+    - 'uksouth'
+    - 'ukwest'
+    - 'australiaeast'
+    - 'australiasoutheast'
+    - 'northeurope'
+    - 'westeurope'
+    - 'westus2'
+- name: adminUsername
+  displayName: 'Admin Username'
+  type: string
+- name: emailAddress
+  displayName: 'Email Address'
+  type: string
+
+variables:
+  dnsName: ${{ parameters.vmName }}
+  domainPattern: ${{ format('{0}.{1}.cloudapp.azure.com', parameters.vmName, parameters.location) }}
 
 trigger: none
 
@@ -24,16 +57,6 @@ stages:
   - job: Create_VM
     steps:
     - powershell: |
-        # Uninstall AzureRM if it's present
-        if (Get-Module -ListAvailable -Name AzureRM) {
-          Write-Host "Uninstalling AzureRM module..."
-          Uninstall-Module -Name AzureRM -AllVersions -Force -ErrorAction SilentlyContinue
-        } else {
-          Write-Host "AzureRM module not found."
-        }
-      displayName: 'Uninstall AzureRM Module'
-    - powershell: |
-        # Install/Update Az module to latest version
         Install-Module -Name Az -AllowClobber -Force -Scope CurrentUser -SkipPublisherCheck -AllowPrerelease
         Import-Module Az
       displayName: 'Install/Update Az Module'
@@ -43,7 +66,7 @@ stages:
         ScriptType: 'FilePath'
         ScriptPath: './create_vm.ps1'
         azurePowerShellVersion: 'LatestVersion'
-        ScriptArguments: '-vmName $(vmName) -resourceGroup $(resourceGroup) -location $(location) -adminUsername $(adminUsername) -dnsName $(dnsName)'
+        ScriptArguments: '-vmName ${{ parameters.vmName }} -resourceGroup ${{ parameters.resourceGroup }} -location ${{ parameters.location }} -adminUsername ${{ parameters.adminUsername }} -dnsName $(dnsName)'
       env:
         ADMINPASSWORD: $(adminPassword)
       displayName: 'Create VM'
@@ -53,16 +76,6 @@ stages:
   - job: Configure_Azure
     steps:
     - powershell: |
-        # Uninstall AzureRM if it's present
-        if (Get-Module -ListAvailable -Name AzureRM) {
-          Write-Host "Uninstalling AzureRM module..."
-          Uninstall-Module -Name AzureRM -AllVersions -Force -ErrorAction SilentlyContinue
-        } else {
-          Write-Host "AzureRM module not found."
-        }
-      displayName: 'Uninstall AzureRM Module'
-    - powershell: |
-        # Install/Update Az module to latest version
         Install-Module -Name Az -AllowClobber -Force -Scope CurrentUser -SkipPublisherCheck -AllowPrerelease
         Import-Module Az
       displayName: 'Install/Update Az Module'
@@ -72,7 +85,7 @@ stages:
         ScriptType: 'FilePath'
         ScriptPath: './configure_azure.ps1'
         azurePowerShellVersion: 'LatestVersion'
-        ScriptArguments: '-vmName $(vmName) -resourceGroup $(resourceGroup) -userPublicIp ${{ parameters.userPublicIp }}'
+        ScriptArguments: '-vmName ${{ parameters.vmName }} -resourceGroup ${{ parameters.resourceGroup }} -userPublicIp ${{ parameters.userPublicIp }}'
       displayName: 'Configure Azure Resources'
 
 - stage: VM_Preparation
@@ -84,7 +97,7 @@ stages:
         azureSubscription: $(azureSubscription)
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
-        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_preparation.ps1'
+        inlineScript: 'az vm run-command invoke --resource-group ${{ parameters.resourceGroup }} --name ${{ parameters.vmName }} --command-id RunPowerShellScript --scripts @./vm_preparation.ps1'
       displayName: 'Prepare VM with pre-configuration settings'
 
 - stage: VM_Server_Configuration
@@ -96,7 +109,7 @@ stages:
         azureSubscription: $(azureSubscription)
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
-        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_server_config.ps1 --parameters "dnsName=$(dnsName)" "emailAddress=$(emailAddress)" "domainPattern=$(domainPattern)"'
+        inlineScript: 'az vm run-command invoke --resource-group ${{ parameters.resourceGroup }} --name ${{ parameters.vmName }} --command-id RunPowerShellScript --scripts @./vm_server_config.ps1 --parameters "dnsName=$(dnsName)" "emailAddress=${{ parameters.emailAddress }}" "domainPattern=$(domainPattern)"'
       displayName: 'Configure VM server-specific settings'
 
 - stage: Software_Installation
@@ -108,5 +121,5 @@ stages:
         azureSubscription: $(azureSubscription)
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
-        inlineScript: 'az vm run-command invoke --resource-group $(resourceGroup) --name $(vmName) --command-id RunPowerShellScript --scripts @./vm_software_install.ps1 --parameters "vsEdition=${{ parameters.vsEdition }}" "vmName=$(vmName)" "adminUsername=$(adminUsername)"'
+        inlineScript: 'az vm run-command invoke --resource-group ${{ parameters.resourceGroup }} --name ${{ parameters.vmName }} --command-id RunPowerShellScript --scripts @./vm_software_install.ps1 --parameters "vsEdition=${{ parameters.vsEdition }}" "vmName=${{ parameters.vmName }}" "adminUsername=${{ parameters.adminUsername }}"'
       displayName: 'Install software on VM'
